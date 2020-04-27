@@ -1,0 +1,17 @@
+Var,State,Good Health,Bad Health
+Medical Cost (in US dollars),20~40,850.2786356,738.4039963
+Labor Income (in US dollars),20~40,24000,10000
+Stock investment (percent in wealth),20~40,3.391878398,1.57444201
+Wealth (in US dollars),20~40,9800,1000
+Medical Cost (in US dollars),40~50,1516.011229,2100.315516
+Labor Income (in US dollars),40~50,33000,9000
+Stock investment (percent in wealth),40~50,6.403559138,2.289863307
+Wealth (in US dollars),40~50,55000,5500
+Medical Cost (in US dollars),50~65,1950.426887,3747.6572
+Labor Income (in US dollars),50~65,42750,16272
+Stock investment (percent in wealth),50~65,13.20660111,6.106013743
+Wealth (in US dollars),50~65,142000,37100
+Medical Cost (in US dollars),65+,2744.385762,4962.34737
+Labor Income (in US dollars),65+,41715.70902,17112
+Stock investment (percent in wealth),65+,16.88975559,8.953100759
+Wealth (in US dollars),65+,244000,88175.5

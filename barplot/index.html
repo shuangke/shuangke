@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+		<meta charset="utf-8">
+		<title>  Financial variables grouped by age and health status  </title>
+		<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+		<style type="text/css">
+			
+			.axis path,
+			.axis line {fill: none;stroke: black;shape-rendering: crispEdges;}
+			.axis text {font-family: sans-serif; font-size: 12px;}	
+			.line {
+				fill: none;
+				stroke: teal;
+				stroke-width: 0.5; }
+			
+			text {
+			  fill: #000;
+			  font: 10px sans-serif;
+			  pointer-events: none;
+			  /*font-weight: bold; //make text bold*/
+			}
+
+			.bar { fill: steelblue; }
+
+			.pagebreak { page-break-before: always; } /* page-break-after works, as well */
+			
+			
+		</style>
+
+		
+	
+</head>
+	
+<body>
+	<!-- Initialize a select button: reference: https://bl.ocks.org/LemoNode/5a64865728c6059ed89388b5f83d6b67--> 
+	 
+	<div id="selectButton">Select variable:  </div>
+
+	<!-- Create a div where the graph will take place -->
+	<div id="my_dataviz"></div>
+
+	<script type="text/javascript">
+
+		d3.dsv(",","CSE6242_finalproject_bar.csv", function(d) {
+			return {
+		    Year : d.Var, 
+		    State: d.State,
+		    "Good Health": +d["Good Health"],
+		    "Bad Health": +d["Bad Health"]
+		  	};
+		}).then(function(dataset) {
+			//// Reference: https://www.d3-graph-gallery.com/graph/barplot_grouped_basicWide.html
+
+			console.log(dataset)
+			//// Find the number of Options: Financial vars in drawdown ///////
+			var data_option = d3.map(dataset, function(d){return(d.Year)}).keys()
+
+			console.log(data_option)
+
+			////Width and height
+			var margin = {top: 50, right: 20, bottom: 50, left: 130},
+		    w = 900 - margin.left - margin.right,
+		    h = 500 - margin.top - margin.bottom;
+		    padding = margin.left;
+
+
+			var subgroups = dataset.columns.slice(2) // same as columnHeaders
+			// console.log(columnHeaders)
+			
+
+			///// svg //////
+			var svg = d3.select("#my_dataviz")
+						.append("svg")
+						.attr("width", w + margin.left + margin.right)
+						.attr("height", h +  margin.top + margin.bottom)
+						.append("g")
+					    .attr("transform", 
+					          "translate(" + margin.left + "," + margin.top + ")");
+
+
+			var selectValue = data_option[0];
+			update_bar(selectValue);
+
+			//////// Drop Down option ///////
+			var select = d3.select('#selectButton')
+							.append('select')
+							.attr('class','select')
+							.on('change',onchange)
+
+			var options = select.selectAll('option')
+							.data(data_option).enter()
+							.append('option')
+							.text(function (d) { return d; });
+
+			function onchange() { // reference: https://www.d3-graph-gallery.com/graph/line_select.html
+				selectValue = d3.select('select').property('value')
+				// console.log(selectValue);
+				svg.selectAll("*").remove();
+				update_bar(selectValue)
+				
+
+			}; // endof onchange()
+
+			
+			function update_bar(selectValue){
+				var data = [];
+				dataset.map(function(d){if (d.Year==selectValue) {data.push(d);}})
+				////// Stacked data, reference d3 book P265
+				// console.log(data)
+				var stack = d3.stack().keys(subgroups);
+				var stackdata = stack(data);
+
+				///// find the maximum stacked value 
+				var maxn = 0;
+				for (var i = 0; i < subgroups.length; i++) {
+				  	maxn = Math.max(d3.max(data.map(function(d){
+						return d[subgroups[i]];
+					})), maxn);
+				}
+
+				
+
+				var xScale_bar = d3.scaleBand()
+			 					.domain(data.map(function (d) {return d.State;}))
+			 					.range([0,w])
+			 					.padding(0.25);
+			 	var xScale = d3.scaleLinear().domain([0,data.length]).range([0,w]);
+
+			 	var yScale_bar = d3.scaleLinear()
+								.domain([0, maxn])
+								.range([h, 0]);
+
+				//Define Y axis
+				var yAxis_line = d3.axisLeft()
+								.scale(yScale_bar)
+								.ticks(10);	
+
+				//Create Y axis
+	   			svg.append("g")
+	   				.attr("class", "y axis")
+	   				.call(yAxis_line);
+
+				// Create X axis
+				svg.append("g")
+					.attr("class", "x axis")
+					.attr("transform", "translate(0," + h + ")")
+					.call(d3.axisBottom(xScale_bar));	
+
+			
+
+				//////////// Group bar plot ////////////
+				// Another scale for subgroup position?
+				var xSubgroup = d3.scaleBand()
+				.domain(subgroups)
+				.range([0, xScale_bar.bandwidth()])
+				.padding([0.05])
+
+				var color = d3.scaleOrdinal()
+							.domain(subgroups)
+							.range(["#2ca25f","#C70039"]);
+
+
+				var layer = svg.selectAll(".stack")
+								.data(stackdata)
+								.enter().append("g")
+								.attr("class", "stack")
+								.style("fill", function (d, i) {
+									return color(subgroups[0]);
+								});
+
+				var groups = d3.map(data, function(d){return(d.State)}).keys()
+				console.log(groups)
+
+				/////////////// Create group bars /////////////
+				svg.append("g")
+					.selectAll("g")
+					.data(function(d) { return data})
+					.enter()
+					.append("g")
+					  .attr("transform", function(d) { return "translate(" + xScale_bar(d.State) + ",0)"; })
+					.selectAll("rect")
+					.data(function(d) { return subgroups.map(function(key) { return {key: key, value: d[key]}; }); })
+					.enter().append("rect")
+					.attr("x", function(d) { return xSubgroup(d.key); })
+					.attr("y", function(d) { return yScale_bar(d.value); })
+					.attr("width", xSubgroup.bandwidth())
+					.attr("height", function(d) { return h - yScale_bar(d.value); })
+					.attr("fill", function(d) { return color(d.key); });	
+
+				
+
+				// Remove old ones
+                layer.exit().remove();
+
+                ///// Legend 
+				var legend = svg.selectAll("legend")
+							.data(subgroups.slice())
+							.enter().append("g")
+							.attr("class", "legend")
+							.attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+
+				legend.append("rect")
+					.attr("x", 0.5*padding) // shift the text a bit more right
+					.attr('y', function(d, i){ return padding/4.5 +  (i *  10) ;})
+					.attr('width', 15)
+					.attr('height', 10)
+					.style("fill", color);
+
+				legend.append("text")
+					.attr("x", 0.65*padding)
+					.attr('y', function(d, i){ return padding/4 + (i *  10) + 6;})
+					.style("font-size", 15)
+					.text(function(d) { return d; });
+
+
+				//// Create title for graph
+				svg.append("text")
+	       		 	.attr("x", (w/2))             
+	        	 	.attr("y", -padding/5)
+	            	.attr("text-anchor", "middle")  
+	             	.style("font-size", "20px")  
+	             	.text("Financial variables by age group and health status");
+
+				//Create user name
+				// svg.append("text")
+	   //      	    .attr("y", h+margin.bottom*0.8)
+				// 	.attr("x", w - 2*margin.right)
+				// 	.attr("text-anchor", "end")
+	   //      	    .style("font-size", "15px")  
+	   //      	    .text("Wallstreet group");
+
+	  			// text label for the x axis
+				svg.append("text")             
+					.attr("transform",
+					    "translate(" + (w/2) + " ," + 
+					                   (h + margin.top*0.8) + ")")
+					.style("text-anchor", "middle")
+					.style("font-size", "15px")
+					.text("Age group");
+
+	   			// text label for the y axis
+				svg.append("text")
+					.attr("transform", "rotate(-90)")
+					.attr("y", 0 - 0.6*margin.left)
+					.attr("x",0 - (h / 2))
+					.attr("dy", "1em")
+					.style("font-size", "15px")
+					.style("text-anchor", "middle")
+					.text("Value"); 
+
+
+
+			} // end of update_bar(selectValue)
+			
+
+		});//end of then()
+	
+
+
+	</script>
+
+</body>
+</html>

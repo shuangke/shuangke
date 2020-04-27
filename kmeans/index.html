@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+/* Style the dots by assigning a fill and stroke */
+.dot {
+    stroke: #fff;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+ 
+
+.grid line {
+	stroke: grey;
+	stroke-opacity: 1;
+	shape-rendering: crispEdges
+}
+.grid path {
+	stroke-width: 0;
+}
+ 
+.x.axis path {
+  display: none;
+ }
+
+.legend{}
+
+.dropdown1{
+    position: absolute;
+	top: 0 px;
+	left: 50 px;	
+}
+
+.dropdown2{
+    position: absolute;
+	top: 0 px;
+	left: 200 px;	
+}
+
+
+ .d3-tip {
+    line-height: 1.5;
+    font-weight: 100;
+    font-family:"avenir next", Arial, sans-serif;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #FFF;
+    border-radius: 1px;
+    pointer-events: none;
+  }
+
+  .d3-tip:after {      
+    box-sizing: border-box;
+    display: inline;
+    font-size: 4px;
+    width: 100%;
+    line-height: 1.5;
+    color: rgba(0, 0, 0, 0.8);
+    position: absolute;
+    pointer-events: none;
+    
+  }
+  
+.option-select {
+  margin-top: 20px;
+  margin-left: 40px;
+  fill: #64b646;
+  width: auto;
+  
+}
+</style>
+<body>
+<div class="container">
+  <div class="row align-items-center">
+    <div class="col-sm-2"><p id="value-step"></p></div>
+    <div class="col-sm"><div id="slider-step"></div></div>
+  </div>
+</div>
+<div id="my_dataviz"></div>
+<div id='vis-container'></div>
+<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<script type="text/javascript" src="../lib/d3-scale-chromatic.v1.min.js"></script>
+<script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+<script type="text/javascript" src="../lib/d3-fetch.min.js"></script>
+<script type="text/javascript" src="../lib/d3-simple-slider.min.js"></script>
+<script type="text/javascript" src="../lib/d3-tip.min.js"></script>
+<script type="text/javascript" src="../lib/topojson.v2.min.js"></script>
+<script>
+
+// get the data
+var wavemap = {};
+var y_var = 'health';
+var x_var = 'age';
+var wave = 1;
+var counts = [];
+var maxvals = {'years_edu': 17.5, 'female_per': 105, 'income': 300, 'health': 100, 'age': 82, 'total_wealth':4000, 'married_per':105}
+var minvals = {'years_edu': 5, 'female_per': -5, 'income': 0, 'health': 0, 'age': 50, 'total_wealth':-250, 'married_per':-5}
+var varnames = {'years_edu': 'Years in Education', 'female_per': '% Females', 'income': '$Income (in thousands)', 'health': 'Self-reported Health (on a scale of 100)', 'age': 'Age', 'total_wealth':'$Total Wealth (in thousands)', 'married_per':'% People Married'}
+
+var colors = ['#d62728', '#ff7f0e', '#9467bd', '#e377c2', '#17becf'];
+
+	
+d3.dsv(",", "cluster_summary.csv").then(function(data){
+		
+		data.forEach(function(d) {
+			var wave = +d.wave;
+			var cluster = +d.idx;
+			var years_edu = +d.years_edu;
+			var female_per = +d.female_per;
+			var income = +d.income;
+			var health = +d.health;
+			var age = +d.age;
+			var total_wealth = +d.total_wealth;
+			var married_per = +d.married_per;
+			var count = +d.count;
+			if (wavemap[wave]){
+				wavemap[wave].push({'cluster':cluster, 'years_edu': years_edu, 'female_per': female_per, 'income': income, 'health': health, 'age':age, 'total_wealth':total_wealth, 
+									'married_per':married_per, 'count':count});}
+			else{
+				wavemap[wave] = []
+				wavemap[wave].push({'cluster':cluster, 'years_edu': years_edu, 'female_per': female_per, 'income': income, 'health': health, 'age':age, 'total_wealth':total_wealth, 
+									'married_per':married_per, 'count':count})
+				}
+		})
+		makeVis(wavemap);
+	});
+
+	
+var makeVis = function(wavemap) {
+  
+	var margin = {top: 50, right: 50, bottom: 30, left: 50}
+	  , width = 0.5*window.innerWidth - margin.left - margin.right 
+	  , height = 0.7*window.innerHeight - margin.top - margin.bottom; 
+
+	var xScale = d3.scaleLinear()
+	.range([0, width]);
+	
+	var yScale = d3.scaleLinear()
+	.range([height, 0]);
+
+	var svg = d3.select("#vis-container").append("svg")
+	.attr("width", width + 2*margin.left + 2*margin.right)
+	.attr("height", height + 2*margin.top + 2*margin.bottom)
+	.append("g")
+	.attr("transform", "translate(" + 2*margin.left + "," + margin.top + ")");
+
+	// Singleplot function
+	var singleplot = function(data, wave, x_variable, y_variable){
+  
+		svg.selectAll("text").remove();
+		svg.selectAll("g").remove();
+		svg.selectAll("#large").remove()
+		
+		var vx = [];
+		var vy = [];
+		var count = [];
+		var dplot = []
+		
+		// Data for single wave
+		for (var i = 0; i < data[wave].length; i++) {
+			vx[i] = {};
+			vx[i]['y'] = +data[wave][i][x_variable];
+			vy[i] = {};
+			vy[i]['y'] = +data[wave][i][y_variable];
+			count[i] = {};
+			count[i]['y'] = +data[wave][i]['count'];
+			dplot[i] = {'x':+data[wave][i][x_variable],'y':+data[wave][i][x_variable],'c': +data[wave][i]['count']};
+			};
+			
+		// Update domains
+		xScale.domain([minvals[x_variable], maxvals[x_variable]]);		 
+		yScale.domain([minvals[y_variable], maxvals[y_variable]]);
+		 
+		// x axis
+		svg.append("g")
+			.attr("class", "x axis")
+			.attr("transform", "translate(0," + height + ")")
+			.call(d3.axisBottom(xScale));
+
+		// y axis
+		svg.append("g")
+			.attr("class", "y axis")
+			.call(d3.axisLeft(yScale));
+
+		//  title
+		svg.append("text")
+			.attr("transform", "translate(" +
+				(width/2) + ",-20)")
+			.attr("class", "title")
+			.attr("font-size", "24")
+			.attr("text-anchor", "middle")
+			.text(varnames[y_var] + " Vs " + varnames[x_var] + " for Wave-" + wave);
+			
+		//  label for the x axis
+		svg.append("text")             
+			.attr("transform",
+				"translate(" + (width/2) + " ," + 
+							   (height + 40) + ")")
+			.style("text-anchor", "middle")
+			.text(varnames[x_var])
+			.style("font-size", "18px") ;
+
+		//  label for the y axis
+		svg.append("text")
+			.attr("transform", "rotate(-90)")
+			.attr("y", -1.5*margin.left)
+			.attr("x",0 - (height / 2))
+			.attr("dy", "1em")
+			.style("text-anchor", "middle")
+			.style("font-size", "18px")  
+			.text(varnames[y_var]);  
+		 
+		// Bubbles for scatterplot
+		svg.selectAll(".bubble")
+			.data(dplot)
+			.enter().append("path")
+			.attr('id', 'large')
+			.attr("class", '.dot')
+			.attr("d", d3.symbol().type(d3.symbolCircle).size(function(d,i){ return 10 + 1*count[i]['y'];}))
+			.attr("transform", function(d,i) {return "translate(" + xScale(vx[i].y) + "," + yScale(vy[i].y) + ")"; })
+			.attr("fill", function(d,i) {return colors[i];})
+			.style("fill-opacity", 0.4);
+			
+		// Points
+		svg.selectAll(".bubble")
+			.data(dplot)
+			.enter().append("path")
+			.attr('id', 'small')
+			.attr("class", '.dot')
+			.attr("d", d3.symbol().type(d3.symbolCircle).size(function(d,i){ return 0 + (wave)*0.04*count[i]['y'];}))
+			.attr("transform", function(d,i) {return "translate(" + xScale(vx[i].y) + "," + yScale(vy[i].y) + ")"; })
+			.attr("fill", function(d,i) {return colors[i];})
+			.style("fill-opacity", 0.1);
+		
+		 
+	};
+			
+			
+	// Slider
+	var waves = [1,2,3,4,5,6,7,8,9,10,11,12,13]
+	var sliderStep = d3
+		.sliderBottom()
+		.min(d3.min(waves))
+		.max(d3.max(waves))
+		.width(300)
+		.tickFormat(d3.format('.0f'))
+		.ticks(13)
+		.step(1)
+		.default(0.015)
+		.on('onchange', val => {
+		y = val;
+		wave = val;
+		singleplot(wavemap, wave, x_var, y_var);
+		});
+
+	var gStep = d3
+		.select('div#slider-step')
+		.append('svg')
+		.attr('width', 500)
+		.attr('height', 100)
+		.append('g')
+		.attr("transform", "translate(" + 20 + "," + -00 + 20 + ")");
+
+	gStep.call(sliderStep);
+	wave = sliderStep.value();
+		
+	//Dropdowns
+	var variables = Object.keys(varnames).sort();
+	
+	// Get X VAR
+	var dropdownChange = function() {
+		x_var = d3.select(this).property('value'),
+		svg.selectAll("#small").remove();
+		singleplot(wavemap, wave, x_var, y_var);
+	};
+	
+	var variables1 = [variables[0], variables[2], variables[1], variables[3], variables[4], variables[5], variables[6]];
+	var dropdown = d3.select("#vis-container")
+		.insert("select", "svg")
+		.on("change", dropdownChange);
+
+	dropdown.selectAll("option")
+		.data(variables1)
+		.enter().append("option")
+		.attr("value", function (d) { return d; })
+		.text(function (d) {
+			return d[0].toUpperCase() + d.slice(1,d.length); // capitalize 1st letter
+		});
+		
+	// Get Y VAR
+	var dropdownChange2 = function() {
+		y_var = d3.select(this).property('value'),
+		svg.selectAll("#small").remove();
+		singleplot(wavemap, wave, x_var, y_var);
+	};
+
+	var variables2 = [variables[2], variables[0], variables[1], variables[3], variables[4], variables[5], variables[6]];
+	var dropdown2 = d3.select("#vis-container")
+		.insert("select", "svg")
+		.on("change", dropdownChange2);
+
+	dropdown2.selectAll("option")
+		.data(variables2)
+		.enter().append("option")
+		.attr("value", function (d) { return d; })
+		.text(function (d) {
+			return d[0].toUpperCase() + d.slice(1,d.length); // capitalize 1st letter
+		});
+
+
+	// Initial plot
+	singleplot(wavemap, wave, x_var, y_var);
+ 
+};
+</script>
+</body>
+</html>

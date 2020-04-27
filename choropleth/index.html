@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<style> 
+  #slider{
+    position: absolute;
+    left: 200px;
+    top: 0px;
+  }
+</style>
+<body>  
+    <script type="text/javascript" src="../lib/d3.v5.min.js" charset = 'utf-8'></script>
+    <script type="text/javascript" src="../lib/d3-dsv.min.js" charset = 'utf-8'></script>
+    <script type="text/javascript" src="../lib/d3-fetch.min.js" charset = 'utf-8'></script>
+    <script type="text/javascript" src="../lib/d3-scale-chromatic.v1.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-simple-slider.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-tip.min.js"></script>
+    <script type="text/javascript" src="../lib/topojson.v2.min.js"></script>
+    <div id="vis1"></div>
+    <div id="slider"></div>
+<script>
+
+var margin = {top: 50, right: 50, bottom: 50, left: 50},
+    width = 975 - margin.left - margin.right,
+    height = 610 - margin.top - margin.bottom;
+
+// Defind svg to use. 
+var svg = d3.select("#vis1").append("svg")
+    .attr("width", width + margin.left + margin.right*4)
+    .attr("height", height + margin.top + margin.bottom*2)
+  .append("g")
+    .attr("transform",
+          `translate(${margin.left},${margin.top})`);
+
+// This projection reference from: https://observablehq.com/@d3/u-s-map 
+// By Mike Bostock
+projection = d3.geoAlbersUsa().scale(1300).translate([487.5, 305])
+var path = d3.geoPath().projection(projection)
+// Get the data
+// Reference from HW2 Q6 descripting link:
+// https://bl.ocks.org/adamjanes/6cf85a4fd79e122695ebde7d41fe327f
+var promises = [d3.json("states-10m.json"),
+                d3.dsv(",","group_by_state_age_final.csv", function(d) {
+                  return {
+                      y_20: +d["20"],
+                      y_30: +d["30"],
+                      y_40: +d["40"],
+                      y_50: +d["50"],
+                      y_60: +d["60"],
+                      y_70: +d["70"],
+                      y_80: +d["80"],
+                      y_90: +d["90"],
+                      state: d.States,
+                  };
+              })];
+
+Promise.all(promises).then(function(data){
+
+  // Display initial year choropleth map
+  draw_choropleth_map(20);
+  // console.log(data[1])
+
+  //implement the step slider
+  //Reference from HW Q6 link:
+  //https://bl.ocks.org/johnwalley/e1d256b81e51da68f7feb632a53c3518
+  var slider = d3.sliderBottom()
+                 .min(20)
+                 .max(90)
+                 .width(300)
+                 .tickFormat(d3.format(",.0f"))
+                 .ticks(7)
+                 .step(10)
+                 .default(20)
+                 .on("onchange",handleselection);
+
+              d3.select("#slider")
+                .append("svg")
+                .attr("width", 400)
+                .attr("height", 80)
+                .append("g")
+                .attr("transform", "translate(80,30)")
+                .call(slider);
+
+function handleselection(yearvalue){
+  //Remove all from svg
+  svg.selectAll("*").remove();
+  draw_choropleth_map(yearvalue)
+}
+
+function draw_choropleth_map(current_year){
+  //var current_year = 2010
+  var usmapdata = data[0];
+  var wealth_health_ratio = data[1]
+  //Debug line
+  //console.log(usmapdata)
+  //console.log(wealth_health_ratio)
+  //console.log(usmapdata.objects.states.geometries)
+
+  var json_state = usmapdata.objects.states.geometries;
+  var y_max = d3.max(wealth_health_ratio.map(function(d){ if(current_year == 20){
+    return d.y_20;
+  }
+  else if(current_year == 30){
+    return d.y_30;
+  }
+  else if(current_year == 40){
+    return d.y_40;
+  }
+  else if(current_year == 50){
+    return d.y_50;
+  }
+  else if(current_year == 60){
+    return d.y_60;
+  }
+  else if(current_year == 70){
+    return d.y_70;
+  }
+  else if(current_year == 80){
+    return d.y_80;
+  }
+  else if(current_year == 90){
+    return d.y_90;
+  }}));
+  var y_min = d3.min(wealth_health_ratio.map(function(d){ if(current_year == 20){
+    return d.y_20;
+  }
+  else if(current_year == 30){
+    return d.y_30;
+  }
+  else if(current_year == 40){
+    return d.y_40;
+  }
+  else if(current_year == 50){
+    return d.y_50;
+  }
+  else if(current_year == 60){
+    return d.y_60;
+  }
+  else if(current_year == 70){
+    return d.y_70;
+  }
+  else if(current_year == 80){
+    return d.y_80;
+  }
+  else if(current_year == 90){
+    return d.y_90;
+  }}));
+  //debug line
+  // console.log(y_max)
+  // console.log(y_min)
+
+  var logScale = d3.scaleLog()
+                   .clamp(true)
+                   .domain([y_min, y_max])
+                   .range([1, 9]);
+
+  var colors = d3.scaleThreshold()
+                 .range(d3.schemeBlues[9])
+                 .domain(d3.range(2, 10));
+
+// This two for loops are developed reference to:
+// https://bl.ocks.org/wboykinm/dbbe50d1023f90d4e241712395c27fb3
+  for (var i = 0; i < wealth_health_ratio.length; i++) {
+    var dataState = wealth_health_ratio[i].state;
+    if(current_year == 20){
+      var dataValue = wealth_health_ratio[i].y_20;
+    }
+    else if(current_year == 30){
+      var dataValue = wealth_health_ratio[i].y_30;
+    }
+    else if(current_year == 40){
+      var dataValue = wealth_health_ratio[i].y_40;
+    }
+    else if(current_year == 50){
+      var dataValue = wealth_health_ratio[i].y_50;
+    }    
+    else if(current_year == 60){
+      var dataValue = wealth_health_ratio[i].y_60;
+    }
+    else if(current_year == 70){
+      var dataValue = wealth_health_ratio[i].y_70;
+    }
+    else if(current_year == 80){
+      var dataValue = wealth_health_ratio[i].y_80;
+    }
+    else if(current_year == 90){
+      var dataValue = wealth_health_ratio[i].y_90;
+    }
+
+    // Map the corresponding state inside the JSON file
+    for (var j = 0; j < usmapdata.objects.states.geometries.length; j++) {
+      var jsonState = json_state[j].properties.name;
+      if (dataState == jsonState) {
+          json_state[j].properties.value = dataValue;
+        break;
+      }
+    }
+  }
+  // Debug line
+  //console.log(json_state)
+  svg.append("g")
+     .attr("class", "states")
+     .selectAll("path")
+     .data(topojson.feature(usmapdata, usmapdata.objects.states).features)
+     .enter()
+     .append("path")
+     .attr("fill",function(d,i){return colors(logScale(json_state[i].properties.value));})
+     .attr("stroke","black")
+     .attr("d", path)
+
+      // Add Legend color
+  var legend_color = d3.schemeBlues[9];
+  svg.selectAll("legend_color")
+    .data(legend_color)
+    .enter()
+    .append("rect")
+    .attr("fill",function(d){return d})
+    .attr("x",width + 20 + 80)
+    .attr("y",function(d,i) {return margin.top + (i-1)*30 -10;})
+    .attr("width",20)
+    .attr("height",20);
+
+  // Add legend text
+  var legend_number = [];
+  for (i = 1; i <= 9; i++) {
+   legend_number.push(i);
+  }
+  var legend_text = [];
+  for (i = 0; i <9; i++){
+    legend_text.push(logScale.invert(legend_number[i]).toFixed(0));
+  }
+  svg.selectAll("legend_text")
+     .data(legend_text)
+     .enter()
+     .append("text")
+     .attr("x", width + 50 + 80)
+     .attr("y", function(d,i){return margin.top+ (i-1)*30 + 5;})
+     .text(function(d){ return d});
+
+  svg.append("text")
+     .attr("x", 150)
+     .attr("y", -20)
+     .style("text-anchor","left")
+     .attr("font-size","20px")
+     .text("Age");
+
+}
+
+});
+
+</script>
+</body>
